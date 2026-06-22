@@ -1,0 +1,5 @@
+sprint_1
+    Creation annotation Controller
+    Generer une seule fois une liste string des classes ayant l annotation Controller
+        Approche 1 : Fonction init dans FrontControllerServlet
+        Approche 2 : Creation de Listener qui va écouter le démarrage de l application 
