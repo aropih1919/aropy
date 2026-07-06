@@ -8,4 +8,5 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface URLMapping {
     String urlPath();
+    String method() default "GET";
 }

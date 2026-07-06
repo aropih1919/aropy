@@ -11,4 +11,9 @@ public class URLInformation {
     public Method getFonction(){ return this.fonction; }
     public void setClazz(Class<?> clazz){this.clazz = clazz;}
     public void setFonction(Method fonction){this.fonction = fonction;}
+    @Override
+    public String toString(){
+        String ret = "class=" + this.clazz.getName() + " -> fonction=" + this.fonction.getName();
+        return ret;
+    }
 }

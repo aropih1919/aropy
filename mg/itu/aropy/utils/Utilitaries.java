@@ -83,21 +83,31 @@ public class Utilitaries {
     //Recherche de method dans une classe
     public static List<Method> findAllMethodIn(Class<?> clazz){
         List<Method> listMethods = new ArrayList<>();
+        System.out.println("###### Taille listeMethods avant ###### =" + listMethods.size());
+
         Method[] methods = clazz.getDeclaredMethods();
         for(int j = 0; j < methods.length; j++){
             listMethods.add(methods[j]);
         }
+        System.out.println("###### Taille listeMethods apres ###### =" + listMethods.size());
+
         return listMethods;
     }
     //Fonction qui retourne Map<String,URLInformation> grandMap
-    public static Map<String,URLInformation> findURLCompleted(String className){
+    public static Map<ModelURLMapping,URLInformation> findURLCompleted(String className){
+        Map<ModelURLMapping,URLInformation> grandMap = new HashMap<>();
         System.out.println("###### VERSION TEST 12345 ###### className=" + className);
-        Map<String,URLInformation> grandMap = new HashMap<>();
         try{
             //par reflection, on cherche laa classe correspondant au string 
-            Class<?> clazz = Class.forName(className);
+            System.out.println("###### AVANT Class.forName");
+            ClassLoader cl = Thread.currentThread().getContextClassLoader();
+            System.out.println("###### Classloader utilisé : " + cl);
+            Class<?> clazz = Class.forName(className, false, cl);
             //pour une classe , obtenir la liste des methods
+            System.out.println("###### AVANT findAllMethodIn");
             List<Method> methods = findAllMethodIn(clazz);
+            System.out.println("###### APRES ");
+
             //parcourir method et verifier si urlMapping présent
             System.out.println("[debug] classe=" + className + " nb methods=" + methods.size());
             for(Method method : methods){
@@ -108,7 +118,8 @@ public class Utilitaries {
                 //si oui, on essaie de obtenir la valeur de l attribut. On fait push avec clés la valeur de l url, et urlInformation pour controller et method
                     URLMapping ump = method.getAnnotation(URLMapping.class);
                     URLInformation ui = new URLInformation(clazz, method);
-                    grandMap.put(ump.urlPath(),ui);
+                    ModelURLMapping modelURLMapping = new ModelURLMapping(ump.urlPath(), ump.method());
+                    grandMap.put(modelURLMapping, ui);
                 }
             }
         }

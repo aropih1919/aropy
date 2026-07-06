@@ -14,11 +14,12 @@ import java.lang.annotation.ElementType;
 import mg.itu.aropy.annotation.AropyController;
 import mg.itu.aropy.utils.Utilitaries;
 import mg.itu.aropy.utils.URLInformation;
+import mg.itu.aropy.utils.ModelURLMapping;
 import java.util.HashMap;
 import java.util.Map;
 public class FrontControllerServlet extends HttpServlet {
     List<String> listController;
-    Map<String,URLInformation> grandMap = new HashMap<>();
+    Map<ModelURLMapping,URLInformation> grandMap = new HashMap<>();
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException {
         processRequest(req, res);
@@ -31,7 +32,7 @@ public class FrontControllerServlet extends HttpServlet {
         System.out.println("Nombre de controllers : " + listController.size());
         for(String controllerName : listController){
             System.out.println("Traitement de : " + controllerName);
-            Map<String,URLInformation> tempo = Utilitaries.findURLCompleted(controllerName);
+            Map<ModelURLMapping,URLInformation> tempo = Utilitaries.findURLCompleted(controllerName);
             System.out.println("  -> " + tempo.size() + " URL(s) trouvée(s)");
             grandMap.putAll(tempo);
         }
@@ -51,23 +52,47 @@ public class FrontControllerServlet extends HttpServlet {
         fillGrandMap();
     }
     public void processRequest(HttpServletRequest req, HttpServletResponse res) throws IOException {
-
+        res.setContentType("text/plain;charset=UTF-8");
         PrintWriter out = res.getWriter();
 
-        String uri = req.getRequestURI();          // /MonProjet/login
-        String context = req.getContextPath();     // /MonProjet
+        String uri = req.getRequestURI();
+        String context = req.getContextPath();
+        String url = uri.substring(context.length());
+        String httpMethod = req.getMethod(); // GET, POST, etc.
 
-        String url = uri.substring(context.length()); // /login
+        ModelURLMapping key = new ModelURLMapping(url, httpMethod);
 
-        if (grandMap.containsKey(url)) {
-            out.println("L'URL est bien trouvée : " + url);
+        out.println("========================================");
+        out.println(" FRONT CONTROLLER - RESULTAT");
+        out.println("========================================");
+        out.println("URI     : " + uri);
+        out.println("Context : " + context);
+        out.println("URL     : " + url);
+        out.println("Methode : " + httpMethod);
+        out.println("----------------------------------------");
+
+        if (grandMap.containsKey(key)) {
+            out.println("STATUT  : OK - URL trouvee");
+            out.println("Detail  : " + grandMap.get(key));
         } else {
-            out.println("L'URL demandée n'est pas disponible.");
-            out.println("URLs existantes :");
-            out.println("Taille de grandMap : " + grandMap.size());
-            for (Map.Entry<String, URLInformation> entry : grandMap.entrySet()) {
-                out.println(entry.getKey() + " -> " + entry.getValue());
+            out.println("STATUT  : ERREUR - URL non disponible");
+            out.println("----------------------------------------");
+            out.println("URLs existantes (" + grandMap.size() + ") :");
+            out.println("----------------------------------------");
+
+            if (grandMap.isEmpty()) {
+                out.println("  (Aucune URL enregistree)");
+            } else {
+                int i = 1;
+                for (Map.Entry<ModelURLMapping, URLInformation> entry : grandMap.entrySet()) {
+                    ModelURLMapping m = entry.getKey();
+                    out.println(i + ". urlPath=" + m.getUrlPath()
+                            +". Method ="+m.getMethod()+ " -> " + entry.getValue());
+                    i++;
+                }
             }
         }
+
+        out.println("========================================");
     }
 }
