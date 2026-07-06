@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.ArrayList;
 import java.io.File;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.lang.annotation.ElementType;
@@ -17,6 +18,7 @@ import mg.itu.aropy.utils.URLInformation;
 import mg.itu.aropy.utils.ModelURLMapping;
 import java.util.HashMap;
 import java.util.Map;
+
 public class FrontControllerServlet extends HttpServlet {
     List<String> listController;
     Map<ModelURLMapping,URLInformation> grandMap = new HashMap<>();
@@ -74,7 +76,27 @@ public class FrontControllerServlet extends HttpServlet {
         if (grandMap.containsKey(key)) {
             out.println("STATUT  : OK - URL trouvee");
             out.println("Detail  : " + grandMap.get(key));
-        } else {
+            URLInformation m = grandMap.get(key);
+            Method method = m.getFonction();
+                    
+            try {
+                Object target = m.getClazz().getDeclaredConstructor().newInstance(); // maintenant dans le try
+                // Rendre la méthode accessible même si elle est private
+                method.setAccessible(true);
+                out.println((String)method.invoke(target));
+            } catch (IllegalAccessException e) {
+                throw new RuntimeException("Impossible d'accéder à la méthode: " + method.getName(), e);
+            } catch (InvocationTargetException e) {
+                // C'est l'exception LEVÉE PAR la méthode invoquée elle-même
+                Throwable cause = e.getCause();
+                throw new RuntimeException("Erreur pendant l'exécution de: " + method.getName(), cause);
+            } catch (IllegalArgumentException e) {
+                throw new RuntimeException("Arguments invalides pour: " + method.getName(), e);
+            } catch (InstantiationException | NoSuchMethodException e) {
+                throw new RuntimeException("Impossible d'instancier la classe: " + m.getClazz().getName(), e);
+            }
+        }
+        else {
             out.println("STATUT  : ERREUR - URL non disponible");
             out.println("----------------------------------------");
             out.println("URLs existantes (" + grandMap.size() + ") :");
