@@ -36,7 +36,9 @@ public class AppInitializer implements ServletContextListener {
             //List<Class<?>> controllerClasses = ClassScanner.getClasses(packageName, Controller.class);
             List<String> controllerNames = new ArrayList<>();
             Map<ModelURLMapping, URLInformation> routes = new HashMap<>();
-
+            
+            String viewPrefix = sce.getServletContext().getInitParameter("viewPrefix");
+            String viewSuffix = sce.getServletContext().getInitParameter("viewSuffix");
             //listController = new ArrayList<>();
             //Récuperer les variables déclarés dans web.xml comme init (on obtiendra une list de package)
             //String packages = getServletConfig().getInitParameter("packages");
@@ -47,13 +49,15 @@ public class AppInitializer implements ServletContextListener {
                 //add dans listController
                 controllerNames.addAll(clazzes);
             }
-
+            //fillGrandMap();
             for (String clazz : controllerNames) {
                 registerController(clazz, routes);
             }
 
             sce.getServletContext().setAttribute("controllerNames", controllerNames);
             sce.getServletContext().setAttribute("routes", routes);
+            sce.getServletContext().setAttribute("viewPrefix", viewPrefix);
+            sce.getServletContext().setAttribute("viewSuffix", viewSuffix);
 
             sce.getServletContext().log("Aropy: " + controllerNames.size() + " contrôleur(s) enregistré(s).");
             sce.getServletContext().log("Aropy: " + routes.size() + " @UrlMapping(s) enregistré(s).");
