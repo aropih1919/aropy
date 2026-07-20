@@ -18,6 +18,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 
+
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 /**
  * Application listener that initializes controller mappings at startup.
  */
@@ -30,7 +33,23 @@ public class AppInitializer implements ServletContextListener {
         if (packageName == null || packageName.isBlank()) {
             sce.getServletContext().log("Aropy: aucun package configuré.");
             return;
+        } 
+        try {
+            String configClassName = sce.getServletContext().getInitParameter("configClass");
+
+            Class<?> configClass = Class.forName(configClassName);
+
+            AnnotationConfigApplicationContext context =
+                    new AnnotationConfigApplicationContext();
+
+            context.register((Class<?>) configClass);
+            context.refresh();
+
+            sce.getServletContext().setAttribute("applicationContext", context);
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException("Aropy: échec de l'initialisation du contexte de l'application.", e);
         }
+        
 
         try {
             //List<Class<?>> controllerClasses = ClassScanner.getClasses(packageName, Controller.class);
