@@ -13,7 +13,7 @@ Reste à faire :
 Fonction qui un method ayant un urlMapping au dessus
 sprint_5
     Creation de ModelAndView OK
-        attribut: 
+        attribut:
             map (attribute)
             url
     Invoquer les fonctions : OK
@@ -21,4 +21,8 @@ sprint_5
             puis on fait une concaténation avec préfixe et suffixe pour l url
             ensuite on boucle les données et le met dans requestDispacher
             Enfin, on fait le requestDispacher.forward
+sprint_5_bis :  integration de notre framework dans un spring
+    L approche de Monsieur c est de surtout trouver un moyen de prendre depuis le framework
+        l applicationContext (conteneur de spring), et de le faire passer vers notre controller, dans controller, on fait juste du getBean pour avoir tout
+    
     
