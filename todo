@@ -8,7 +8,7 @@ sprint_2
     Creation de la classe URLInformation dans utils pour stocker class - method OK
     Creation de l attribut HashMap pour stocké clé(url) + classe (pour assurer l unicité de l url) OK
     Creation de la fonction pour detecter fonction dans une classe OK
-    Creation de la fonction pour detecter l existence de l annotation pour une methode 
+    Creation de la fonction pour detecter l existence de l annotation pour une methode
 Reste à faire :
 Fonction qui un method ayant un urlMapping au dessus
 sprint_5
@@ -24,5 +24,16 @@ sprint_5
 sprint_5_bis :  integration de notre framework dans un spring
     L approche de Monsieur c est de surtout trouver un moyen de prendre depuis le framework
         l applicationContext (conteneur de spring), et de le faire passer vers notre controller, dans controller, on fait juste du getBean pour avoir tout
-    
-    
+
+sprint_6: web api 
+Objectif : permettre au client de dire que cette méthode ne se redirige pas directement vers un view, mais retourne du JSON
+Idea : Creer une annotation ResponseBody (anarana mety foana niveau methode)
+if else pour existence de annotation pour format json.
+On gère son existence
+    si non, normal
+    si oui, on test le valeur de retour de la fonction, si autre que string, on fait toString, 
+    si non, si déjà string, on fait donc le printWriter
+    (ajout : pour l annotation, verifier si c est déjà string ou pas)
+
+sprint_ : binding
+Objectif : transmettre des donnees 
