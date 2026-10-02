@@ -19,6 +19,7 @@ import mg.itu.aropy.utils.ModelURLMapping;
 import java.util.HashMap;
 import java.util.Map;
 import mg.itu.aropy.web.ModelAndView;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class FrontControllerServlet extends HttpServlet {
     List<String> listController;
@@ -104,18 +105,10 @@ public class FrontControllerServlet extends HttpServlet {
 
         ModelURLMapping key = new ModelURLMapping(url, httpMethod);
 
-        out.println("========================================");
-        out.println(" FRONT CONTROLLER - RESULTAT");
-        out.println("========================================");
-        out.println("URI     : " + uri);
-        out.println("Context : " + context);
-        out.println("URL     : " + url);
-        out.println("Methode : " + httpMethod);
-        out.println("----------------------------------------");
+        
 
         if (grandMap.containsKey(key)) {
-            out.println("STATUT  : OK - URL trouvee");
-            out.println("Detail  : " + grandMap.get(key));
+            
             URLInformation m = grandMap.get(key);
             Method method = m.getFonction();
                     
@@ -123,7 +116,36 @@ public class FrontControllerServlet extends HttpServlet {
                 Object target = m.getClazz().getDeclaredConstructor().newInstance();
                 // Rendre la méthode accessible même si elle est private
                 method.setAccessible(true);
+                // Vérification si la méthode a l'annotation @ResponseBody
+                boolean isResponseBody = method.isAnnotationPresent(mg.itu.aropy.annotation.ResponseBody.class);
                 Object result = method.invoke(target);
+                if (isResponseBody) {
+                    ObjectMapper MAPPER = new ObjectMapper();
+                    //Verifier si c est pas encore du string
+                    String jsonResponse = "";
+                    if (!(result instanceof String)) {
+                        // Convertir l'objet en String
+                        jsonResponse = result.toString();
+                    } else {
+                        jsonResponse = (String) result;
+                    }
+                    res.setContentType("application/json");
+                    res.setCharacterEncoding("UTF-8");
+                    res.getWriter().print(MAPPER.writeValueAsString(jsonResponse));
+                    // out.print(jsonResponse);
+                    out.flush();
+                    return; // Sortir de la méthode après avoir écrit la réponse JSON
+                }
+                out.println("STATUT  : OK - URL trouvee");
+                out.println("Detail  : " + grandMap.get(key));
+                out.println("========================================");
+                out.println(" FRONT CONTROLLER - RESULTAT");
+                out.println("========================================");
+                out.println("URI     : " + uri);
+                out.println("Context : " + context);
+                out.println("URL     : " + url);
+                out.println("Methode : " + httpMethod);
+                out.println("----------------------------------------");
                 if (result instanceof ModelAndView) {
                     ModelAndView modelAndView = (ModelAndView) result;
                     String urlPathView = viewPrefix + modelAndView.getUrl() + viewSuffix;
@@ -133,8 +155,11 @@ public class FrontControllerServlet extends HttpServlet {
                     for (Map.Entry<String, Object> entry : modelAndView.getAttributes().entrySet()) {
                         req.setAttribute(entry.getKey(), entry.getValue());
                     }
+                    // Misy if else pour l annotation de json
+
                     // Redirection vers la vue
                     dispatcher.forward(req, res);
+                    return;
                     // out.println("ModelAndView URL: " + modelAndView.getUrl());
                     // out.println("ModelAndView Attributes: " + modelAndView.getAttributes());
                 } else {

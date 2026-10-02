@@ -24,7 +24,7 @@ import org.springframework.context.annotation.AnnotationConfigApplicationContext
 /**
  * Application listener that initializes controller mappings at startup.
  */
-@WebListener
+// @WebListener
 public class AppInitializer implements ServletContextListener {
 
     @Override
@@ -33,23 +33,82 @@ public class AppInitializer implements ServletContextListener {
         if (packageName == null || packageName.isBlank()) {
             sce.getServletContext().log("Aropy: aucun package configuré.");
             return;
-        } 
+        }
+        // try {
+        //     String configClassName = sce.getServletContext().getInitParameter("configClass");
+
+        //     Class<?> configClass = Class.forName(configClassName);
+
+        //     AnnotationConfigApplicationContext context =
+        //             new AnnotationConfigApplicationContext();
+
+        //     context.register((Class<?>) configClass);
+        //     context.refresh();
+
+        //     sce.getServletContext().setAttribute("applicationContext", context);
+        // } catch (ClassNotFoundException e) {
+        //     throw new RuntimeException("Aropy: échec de l'initialisation du contexte de l'application.", e);
+        // }
         try {
-            String configClassName = sce.getServletContext().getInitParameter("configClass");
+            String configClassName =
+                    sce.getServletContext().getInitParameter("configClass");
 
-            Class<?> configClass = Class.forName(configClassName);
+            if (configClassName == null || configClassName.isBlank()) {
+                throw new RuntimeException(
+                    "Aropy: le paramètre 'configClass' est absent."
+                );
+            }
 
-            AnnotationConfigApplicationContext context =
-                    new AnnotationConfigApplicationContext();
+            // sce.getServletContext().log(
+            //     "Aropy: chargement de la configuration : " + configClassName
+            // );
+            ClassLoader webappCl = sce.getServletContext().getClassLoader();
+            // ou Thread.currentThread().getContextClassLoader()
 
-            context.register((Class<?>) configClass);
+            Class<?> configClass = Class.forName(configClassName, true, webappCl);
+
+            AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
+            context.setClassLoader(webappCl);   // pour que @ComponentScan voie les classes de la webapp
+            context.register(configClass);
             context.refresh();
 
-            sce.getServletContext().setAttribute("applicationContext", context);
-        } catch (ClassNotFoundException e) {
-            throw new RuntimeException("Aropy: échec de l'initialisation du contexte de l'application.", e);
+            // Class<?> configClass = Class.forName(configClassName);
+
+            // sce.getServletContext().log(
+            //     "Aropy: classe de configuration trouvée : " + configClass.getName()
+            // );
+
+            // AnnotationConfigApplicationContext context =
+            //         new AnnotationConfigApplicationContext();
+
+            // context.register(configClass);
+
+            // sce.getServletContext().log(
+            //     "Aropy: configuration enregistrée."
+            // );
+
+            // context.refresh();
+
+            // sce.getServletContext().log(
+            //     "Aropy: contexte Spring initialisé."
+            // );
+
+            // sce.getServletContext().setAttribute(
+            //     "applicationContext",
+            //     context
+            // );
+
+        } catch (Exception e) {
+            sce.getServletContext().log(
+                "Aropy: erreur lors de l'initialisation du contexte Spring.",
+                e
+            );
+
+            throw new RuntimeException(
+                "Aropy: échec de l'initialisation du contexte de l'application.",
+                e
+            );
         }
-        
 
         try {
             //List<Class<?>> controllerClasses = ClassScanner.getClasses(packageName, Controller.class);
