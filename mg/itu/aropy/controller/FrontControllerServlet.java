@@ -20,6 +20,8 @@ import java.util.HashMap;
 import java.util.Map;
 import mg.itu.aropy.web.ModelAndView;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.lang.reflect.Parameter;
+import mg.itu.aropy.annotation.ResponseBody;
 
 public class FrontControllerServlet extends HttpServlet {
     List<String> listController;
@@ -116,9 +118,24 @@ public class FrontControllerServlet extends HttpServlet {
                 Object target = m.getClazz().getDeclaredConstructor().newInstance();
                 // Rendre la méthode accessible même si elle est private
                 method.setAccessible(true);
+                // Section pour la gestion de invoke fonction avec arguments 
+                    //Verification de l existance de arguments
+                    Parameter[] parametres = method.getParameters();
+                    Object result = new Object();
+                    if(parametres.length!=0){
+                        //fonction de matching à appeler
+                        List<Object> arguments = Utilitaries.matcher(parametres,req);
+                        if(arguments.size() != parametres.length) {
+                            throw new RuntimeException("Nombre d'arguments fournis (" + arguments.size() + ") ne correspond pas au nombre de paramètres attendus (" + parametres.length + ")");
+                        }
+                        result = method.invoke(target, arguments.toArray());
+                    }
+                    else{
+                        result = method.invoke(target);
+                    }
                 // Vérification si la méthode a l'annotation @ResponseBody
                 boolean isResponseBody = method.isAnnotationPresent(mg.itu.aropy.annotation.ResponseBody.class);
-                Object result = method.invoke(target);
+
                 if (isResponseBody) {
                     ObjectMapper MAPPER = new ObjectMapper();
                     //Verifier si c est pas encore du string
@@ -136,6 +153,7 @@ public class FrontControllerServlet extends HttpServlet {
                     out.flush();
                     return; // Sortir de la méthode après avoir écrit la réponse JSON
                 }
+                
                 out.println("STATUT  : OK - URL trouvee");
                 out.println("Detail  : " + grandMap.get(key));
                 out.println("========================================");

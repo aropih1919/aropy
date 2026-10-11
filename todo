@@ -35,5 +35,13 @@ On gère son existence
     si non, si déjà string, on fait donc le printWriter
     (ajout : pour l annotation, verifier si c est déjà string ou pas)
 
-sprint_ : binding
-Objectif : transmettre des donnees 
+sprint_7 : binding
+Objectif : transmettre des donnees depuis la view vers le controller (a partir d un formulaire)
+Comment ?
+maper un url avec une fonction ayant un ou des arguments.
+Lorsqu'on verifie ensuite la méthode, on regarde si il possède un parametre ou pas?
+Si oui, matching avy hatrany : fantatra ny anaran'ny variable, fantatra ny anaran'ny argument an ilay fonction, matchez les memes. On peut desormais invoquer une fonction avec des attributs. 
+Attribut des fonctions par defaut c est null
+Steps:
+1. creation de la fonction dans test avec le map url 
+2. creation de la section de verification d argument pour la fonction dans frontController
