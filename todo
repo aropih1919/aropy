@@ -43,5 +43,18 @@ Lorsqu'on verifie ensuite la méthode, on regarde si il possède un parametre ou
 Si oui, matching avy hatrany : fantatra ny anaran'ny variable, fantatra ny anaran'ny argument an ilay fonction, matchez les memes. On peut desormais invoquer une fonction avec des attributs. 
 Attribut des fonctions par defaut c est null
 Steps:
-1. creation de la fonction dans test avec le map url 
-2. creation de la section de verification d argument pour la fonction dans frontController
+1. creation de la fonction dans test avec le map url OK
+2. creation de la section de verification d argument pour la fonction dans frontController OK
+(il y avait un problème dans la lecture du nom des parametres)
+
+sprint_7_bis : le vrai binding
+Objectif : Avoir un formulaire par exemple qui complète les attributs d un objet (ex: etudiant), apres submission, dans 
+le controlleur, il existe une fonction par exemple save ayant comme argument l entite meme de l objet (directement un Etudiant)
+Comment?
+On verifie d abord si l argument du fonction dans le controller est autre que les types basique (String, int, double, etc), si c est oui:
+Deux cas : 
+Argument avec un ou des objets differents OK
+    recupère la classe d abord, puis ensuite, on récupère les noms de l attribut, apres vienne le binding avec instanciation sur le nouveau entité OK
+    attribut de l objet qui est aussi un objet à gérer OK
+Argument avec une liste d objets 
+    recupère les ....... ?

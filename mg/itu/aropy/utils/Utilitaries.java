@@ -5,6 +5,8 @@ import java.lang.annotation.Annotation;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Target;
 import java.lang.reflect.AnnotatedElement;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.util.ArrayList;
@@ -16,6 +18,7 @@ import mg.itu.aropy.annotation.URLMapping;
 import jakarta.servlet.*;
 import jakarta.servlet.http.*;
 import java.lang.reflect.Parameter;
+import java.lang.reflect.InvocationTargetException;
 
 public class Utilitaries {
     public static List<Class<?>> findAllClassesIn(String packageName)throws Exception{
@@ -159,21 +162,28 @@ public class Utilitaries {
 
         for (Parameter parametre : parametres) {
             String nomParam = parametre.getName();
-            String valeur = req.getParameter(nomParam);
+            
+            //verification si type de parametre est encore basique (String, int, double, boolean, etc.) ou un enum
+            if(typeIsSupported(parametre.getType())){
+                String valeur = req.getParameter(nomParam);
 
-            System.out.println("Nom du paramètre Java : " + nomParam);
-            System.out.println("Valeur reçue : " + valeur);
+                System.out.println("Nom du paramètre Java : " + nomParam);
+                System.out.println("Valeur reçue : " + valeur);
 
-            if (valeur == null) {
-                throw new IllegalArgumentException(
-                    "Paramètre HTTP manquant : " + nomParam
-                    + ". Vérifiez que la méthode a été compilée avec -parameters."
-                );
+                if (valeur == null) {
+                    throw new IllegalArgumentException(
+                        "Paramètre HTTP manquant : " + nomParam
+                        + ". Vérifiez que la méthode a été compilée avec -parameters."
+                    );
+                }
+
+                arguments.add(convertParameter(valeur, parametre.getType(), nomParam));
             }
-
-            arguments.add(convertParameter(valeur, parametre.getType(), nomParam));
+            else {
+                Object instance = binderObject(parametre.getType(),nomParam,req);
+                arguments.add(instance);
+            }
         }
-
         return arguments;
     }
 
@@ -211,5 +221,100 @@ public class Utilitaries {
         throw new IllegalArgumentException(
             "Type de paramètre non pris en charge pour '" + nomParam + "' : " + type.getName()
         );
+    }
+    public static boolean typeIsSupported(Class<?> type) {
+        return type == String.class || type == Object.class ||
+               type == int.class || type == Integer.class ||
+               type == long.class || type == Long.class ||
+               type == double.class || type == Double.class ||
+               type == float.class || type == Float.class ||
+               type == short.class || type == Short.class ||
+               type == byte.class || type == Byte.class ||
+               type == boolean.class || type == Boolean.class ||
+               type == char.class || type == Character.class ||
+               type.isEnum();
+    }
+    private static Object binderObject(Class<?> type,String prefixe,HttpServletRequest req) {
+        try {
+            // 1. Instancier l'objet
+            Object instance = type.getDeclaredConstructor().newInstance();
+
+            // 2. Parcourir les attributs de la classe
+            Field[] fields = type.getDeclaredFields();
+
+            for (Field field : fields) {
+
+                String nomField = field.getName();
+
+                // Construire le nom du paramètre HTTP
+                String nomHttp = prefixe.isEmpty()
+                        ? nomField
+                        : prefixe + "." + nomField;
+
+                Class<?> typeField = field.getType();
+
+                // 3. Traiter les attributs simples
+                if (typeIsSupported(typeField)) {
+
+                    String valeur = req.getParameter(nomHttp);
+
+                    if (valeur != null) {
+
+                        field.setAccessible(true);
+
+                        Object valeurConvertie = convertParameter(
+                                valeur,
+                                typeField,
+                                nomHttp
+                        );
+
+                        field.set(instance, valeurConvertie);
+                    }
+
+                } else {
+                    // 4. Traiter récursivement les objets imbriqués
+                    Object objetImbrique = binderObject(
+                            typeField,
+                            nomHttp,
+                            req
+                    );
+
+                    field.setAccessible(true);
+                    field.set(instance, objetImbrique);
+                }
+            }
+
+            return instance;
+
+        } catch (NoSuchMethodException e) {
+            throw new RuntimeException(
+                    "Aucun constructeur sans argument pour : "
+                            + type.getName(), e
+            );
+
+        } catch (InstantiationException e) {
+            throw new RuntimeException(
+                    "Impossible d'instancier : "
+                            + type.getName(), e
+            );
+
+        } catch (IllegalAccessException e) {
+            throw new RuntimeException(
+                    "Impossible d'accéder aux attributs de : "
+                            + type.getName(), e
+            );
+
+        } catch (InvocationTargetException e) {
+            throw new RuntimeException(
+                    "Erreur dans le constructeur de : "
+                            + type.getName(), e.getCause()
+            );
+
+        } catch (SecurityException e) {
+            throw new RuntimeException(
+                    "Accès refusé pour : "
+                            + type.getName(), e
+            );
+        }
     }
 }
