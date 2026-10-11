@@ -13,6 +13,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import mg.itu.aropy.annotation.URLMapping;
+import jakarta.servlet.*;
+import jakarta.servlet.http.*;
+import java.lang.reflect.Parameter;
 
 public class Utilitaries {
     public static List<Class<?>> findAllClassesIn(String packageName)throws Exception{
@@ -133,6 +136,80 @@ public class Utilitaries {
         //à la fin, on retourne 
         
         return grandMap;
-        
+    }
+    //fonction de matching entre requetes et arguments.
+    // public static List<Object> matcher(Parameter[] parametres,HttpServletRequest req){
+    //     List<Object> arguments = new ArrayList<>();
+    //     for (Parameter parametre : parametres) {
+    //     // Recuperer nom des params
+    //         String nomParam = parametre.getName();
+    //         if(req.getParameter(nomParam) != null){
+    //             arguments.add(req.getParameter(nomParam));
+    //         }
+    //     }
+    //     // Verifier dans nom du req l existance
+    //     // Si oui, on match direct
+    //     return arguments;
+    // }
+    public static List<Object> matcher(
+        Parameter[] parametres,
+        HttpServletRequest req) {
+
+        List<Object> arguments = new ArrayList<>();
+
+        for (Parameter parametre : parametres) {
+            String nomParam = parametre.getName();
+            String valeur = req.getParameter(nomParam);
+
+            System.out.println("Nom du paramètre Java : " + nomParam);
+            System.out.println("Valeur reçue : " + valeur);
+
+            if (valeur == null) {
+                throw new IllegalArgumentException(
+                    "Paramètre HTTP manquant : " + nomParam
+                    + ". Vérifiez que la méthode a été compilée avec -parameters."
+                );
+            }
+
+            arguments.add(convertParameter(valeur, parametre.getType(), nomParam));
+        }
+
+        return arguments;
+    }
+
+    private static Object convertParameter(String valeur, Class<?> type, String nomParam) {
+        try {
+            if (type == String.class || type == Object.class) return valeur;
+            if (type == int.class || type == Integer.class) return Integer.valueOf(valeur);
+            if (type == long.class || type == Long.class) return Long.valueOf(valeur);
+            if (type == double.class || type == Double.class) return Double.valueOf(valeur);
+            if (type == float.class || type == Float.class) return Float.valueOf(valeur);
+            if (type == short.class || type == Short.class) return Short.valueOf(valeur);
+            if (type == byte.class || type == Byte.class) return Byte.valueOf(valeur);
+            if (type == boolean.class || type == Boolean.class) {
+                if (!"true".equalsIgnoreCase(valeur) && !"false".equalsIgnoreCase(valeur)) {
+                    throw new IllegalArgumentException("valeur booléenne invalide");
+                }
+                return Boolean.valueOf(valeur);
+            }
+            if (type == char.class || type == Character.class) {
+                if (valeur.length() != 1) throw new IllegalArgumentException("caractère invalide");
+                return valeur.charAt(0);
+            }
+            if (type.isEnum()) {
+                @SuppressWarnings({"rawtypes", "unchecked"})
+                Object enumValue = Enum.valueOf((Class<? extends Enum>) type, valeur);
+                return enumValue;
+            }
+        } catch (RuntimeException e) {
+            throw new IllegalArgumentException(
+                "Valeur '" + valeur + "' invalide pour le paramètre '" + nomParam
+                + "' de type " + type.getSimpleName(), e
+            );
+        }
+
+        throw new IllegalArgumentException(
+            "Type de paramètre non pris en charge pour '" + nomParam + "' : " + type.getName()
+        );
     }
 }
