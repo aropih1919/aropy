@@ -8,18 +8,22 @@ import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import mg.itu.aropy.annotation.URLMapping;
-import jakarta.servlet.*;
-import jakarta.servlet.http.*;
-import java.lang.reflect.Parameter;
-import java.lang.reflect.InvocationTargetException;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
+import jakarta.servlet.http.HttpServletRequest;
+import mg.itu.aropy.annotation.URLMapping;
 public class Utilitaries {
     public static List<Class<?>> findAllClassesIn(String packageName)throws Exception{
         //fonction rechercher les classes dispo dans packageName
@@ -162,7 +166,7 @@ public class Utilitaries {
 
         for (Parameter parametre : parametres) {
             String nomParam = parametre.getName();
-            
+            Class<?> typeParam = parametre.getType();
             //verification si type de parametre est encore basique (String, int, double, boolean, etc.) ou un enum
             if(typeIsSupported(parametre.getType())){
                 String valeur = req.getParameter(nomParam);
@@ -177,10 +181,17 @@ public class Utilitaries {
                     );
                 }
 
-                arguments.add(convertParameter(valeur, parametre.getType(), nomParam));
-            }
-            else {
-                Object instance = binderObject(parametre.getType(),nomParam,req);
+                arguments.add(convertParameter(valeur,typeParam, nomParam));
+            }else if (List.class.isAssignableFrom(typeParam)) {
+                // Exemple : List<String> competences -> competences[0], competences[1]
+                arguments.add(binderList(
+                    parametre.getParameterizedType(),
+                    nomParam,
+                    req
+                ));
+
+            }else {
+                Object instance = binderObject(typeParam,nomParam,req);
                 arguments.add(instance);
             }
         }
@@ -252,7 +263,7 @@ public class Utilitaries {
                         : prefixe + "." + nomField;
 
                 Class<?> typeField = field.getType();
-
+                
                 // 3. Traiter les attributs simples
                 if (typeIsSupported(typeField)) {
 
@@ -271,7 +282,18 @@ public class Utilitaries {
                         field.set(instance, valeurConvertie);
                     }
 
-                } else {
+                } else if (List.class.isAssignableFrom(typeField)) {
+                    // Traiter une liste : List<String>, List<Fruit>, etc.
+                    List<?> liste = binderList(
+                            field.getGenericType(),
+                            nomHttp,
+                            req
+                    );
+
+                    field.setAccessible(true);
+                    field.set(instance, liste);
+
+                }else {
                     // 4. Traiter récursivement les objets imbriqués
                     Object objetImbrique = binderObject(
                             typeField,
@@ -316,5 +338,82 @@ public class Utilitaries {
                             + type.getName(), e
             );
         }
+    }
+    private static List<Object> binderList(
+            Type genericType,
+            String prefixe,
+            HttpServletRequest req) {
+
+        Class<?> elementType = getListElementType(genericType, prefixe);
+        Set<Integer> indexes = getListIndexes(prefixe, req);
+        List<Object> resultat = new ArrayList<>();
+
+        for (Integer index : indexes) {
+            String prefixeElement = prefixe + "[" + index + "]";
+
+            if (typeIsSupported(elementType)) {
+                String valeur = req.getParameter(prefixeElement);
+
+                if (valeur == null) {
+                    throw new IllegalArgumentException(
+                        "Paramètre HTTP manquant : " + prefixeElement
+                    );
+                }
+
+                resultat.add(convertParameter(valeur, elementType, prefixeElement));
+            } else {
+                // Construit l'objet avec les champs comme fruits[0].nom.
+                resultat.add(binderObject(elementType, prefixeElement, req));
+            }
+        }
+
+        return resultat;
+    }
+
+    /**
+     * Récupère le type de List<T>, par exemple String.class ou Fruit.class.
+     */
+    private static Class<?> getListElementType(Type genericType, String nomListe) {
+        if (!(genericType instanceof ParameterizedType)) {
+            throw new IllegalArgumentException(
+                "Précisez le type générique de la liste " + nomListe
+                + " (exemple : List<String> ou List<Fruit>)."
+            );
+        }
+
+        ParameterizedType parameterizedType = (ParameterizedType) genericType;
+        Type elementType = parameterizedType.getActualTypeArguments()[0];
+
+        if (!(elementType instanceof Class<?>)) {
+            throw new IllegalArgumentException(
+                "Type d'élément non pris en charge dans la liste "
+                + nomListe + " : " + elementType.getTypeName()
+            );
+        }
+
+        return (Class<?>) elementType;
+    }
+
+    /**
+     * Repère les indices présents dans la requête, dans l'ordre croissant.
+     * Exemple : fruits[0].nom et fruits[0].prix représentent un seul indice : 0.
+     */
+    private static Set<Integer> getListIndexes(
+            String prefixe,
+            HttpServletRequest req) {
+
+        Set<Integer> indexes = new TreeSet<>();
+        Pattern pattern = Pattern.compile(
+            Pattern.quote(prefixe) + "\\[(\\d+)\\](?:\\..*)?"
+        );
+
+        for (String nomParam : req.getParameterMap().keySet()) {
+            Matcher matcher = pattern.matcher(nomParam);
+            if (matcher.matches()) {
+                indexes.add(Integer.parseInt(matcher.group(1)));
+            }
+        }
+
+        return indexes;
     }
 }
