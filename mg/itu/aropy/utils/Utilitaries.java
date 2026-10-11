@@ -5,18 +5,25 @@ import java.lang.annotation.Annotation;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Target;
 import java.lang.reflect.AnnotatedElement;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import mg.itu.aropy.annotation.URLMapping;
-import jakarta.servlet.*;
-import jakarta.servlet.http.*;
-import java.lang.reflect.Parameter;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
+import jakarta.servlet.http.HttpServletRequest;
+import mg.itu.aropy.annotation.URLMapping;
 public class Utilitaries {
     public static List<Class<?>> findAllClassesIn(String packageName)throws Exception{
         //fonction rechercher les classes dispo dans packageName
@@ -159,21 +166,35 @@ public class Utilitaries {
 
         for (Parameter parametre : parametres) {
             String nomParam = parametre.getName();
-            String valeur = req.getParameter(nomParam);
+            Class<?> typeParam = parametre.getType();
+            //verification si type de parametre est encore basique (String, int, double, boolean, etc.) ou un enum
+            if(typeIsSupported(parametre.getType())){
+                String valeur = req.getParameter(nomParam);
 
-            System.out.println("Nom du paramètre Java : " + nomParam);
-            System.out.println("Valeur reçue : " + valeur);
+                System.out.println("Nom du paramètre Java : " + nomParam);
+                System.out.println("Valeur reçue : " + valeur);
 
-            if (valeur == null) {
-                throw new IllegalArgumentException(
-                    "Paramètre HTTP manquant : " + nomParam
-                    + ". Vérifiez que la méthode a été compilée avec -parameters."
-                );
+                if (valeur == null) {
+                    throw new IllegalArgumentException(
+                        "Paramètre HTTP manquant : " + nomParam
+                        + ". Vérifiez que la méthode a été compilée avec -parameters."
+                    );
+                }
+
+                arguments.add(convertParameter(valeur,typeParam, nomParam));
+            }else if (List.class.isAssignableFrom(typeParam)) {
+                // Exemple : List<String> competences -> competences[0], competences[1]
+                arguments.add(binderList(
+                    parametre.getParameterizedType(),
+                    nomParam,
+                    req
+                ));
+
+            }else {
+                Object instance = binderObject(typeParam,nomParam,req);
+                arguments.add(instance);
             }
-
-            arguments.add(convertParameter(valeur, parametre.getType(), nomParam));
         }
-
         return arguments;
     }
 
@@ -211,5 +232,188 @@ public class Utilitaries {
         throw new IllegalArgumentException(
             "Type de paramètre non pris en charge pour '" + nomParam + "' : " + type.getName()
         );
+    }
+    public static boolean typeIsSupported(Class<?> type) {
+        return type == String.class || type == Object.class ||
+               type == int.class || type == Integer.class ||
+               type == long.class || type == Long.class ||
+               type == double.class || type == Double.class ||
+               type == float.class || type == Float.class ||
+               type == short.class || type == Short.class ||
+               type == byte.class || type == Byte.class ||
+               type == boolean.class || type == Boolean.class ||
+               type == char.class || type == Character.class ||
+               type.isEnum();
+    }
+    private static Object binderObject(Class<?> type,String prefixe,HttpServletRequest req) {
+        try {
+            // 1. Instancier l'objet
+            Object instance = type.getDeclaredConstructor().newInstance();
+
+            // 2. Parcourir les attributs de la classe
+            Field[] fields = type.getDeclaredFields();
+
+            for (Field field : fields) {
+
+                String nomField = field.getName();
+
+                // Construire le nom du paramètre HTTP
+                String nomHttp = prefixe.isEmpty()
+                        ? nomField
+                        : prefixe + "." + nomField;
+
+                Class<?> typeField = field.getType();
+                
+                // 3. Traiter les attributs simples
+                if (typeIsSupported(typeField)) {
+
+                    String valeur = req.getParameter(nomHttp);
+
+                    if (valeur != null) {
+
+                        field.setAccessible(true);
+
+                        Object valeurConvertie = convertParameter(
+                                valeur,
+                                typeField,
+                                nomHttp
+                        );
+
+                        field.set(instance, valeurConvertie);
+                    }
+
+                } else if (List.class.isAssignableFrom(typeField)) {
+                    // Traiter une liste : List<String>, List<Fruit>, etc.
+                    List<?> liste = binderList(
+                            field.getGenericType(),
+                            nomHttp,
+                            req
+                    );
+
+                    field.setAccessible(true);
+                    field.set(instance, liste);
+
+                }else {
+                    // 4. Traiter récursivement les objets imbriqués
+                    Object objetImbrique = binderObject(
+                            typeField,
+                            nomHttp,
+                            req
+                    );
+
+                    field.setAccessible(true);
+                    field.set(instance, objetImbrique);
+                }
+            }
+
+            return instance;
+
+        } catch (NoSuchMethodException e) {
+            throw new RuntimeException(
+                    "Aucun constructeur sans argument pour : "
+                            + type.getName(), e
+            );
+
+        } catch (InstantiationException e) {
+            throw new RuntimeException(
+                    "Impossible d'instancier : "
+                            + type.getName(), e
+            );
+
+        } catch (IllegalAccessException e) {
+            throw new RuntimeException(
+                    "Impossible d'accéder aux attributs de : "
+                            + type.getName(), e
+            );
+
+        } catch (InvocationTargetException e) {
+            throw new RuntimeException(
+                    "Erreur dans le constructeur de : "
+                            + type.getName(), e.getCause()
+            );
+
+        } catch (SecurityException e) {
+            throw new RuntimeException(
+                    "Accès refusé pour : "
+                            + type.getName(), e
+            );
+        }
+    }
+    private static List<Object> binderList(
+            Type genericType,
+            String prefixe,
+            HttpServletRequest req) {
+
+        Class<?> elementType = getListElementType(genericType, prefixe);
+        Set<Integer> indexes = getListIndexes(prefixe, req);
+        List<Object> resultat = new ArrayList<>();
+
+        for (Integer index : indexes) {
+            String prefixeElement = prefixe + "[" + index + "]";
+
+            if (typeIsSupported(elementType)) {
+                String valeur = req.getParameter(prefixeElement);
+
+                if (valeur == null) {
+                    throw new IllegalArgumentException(
+                        "Paramètre HTTP manquant : " + prefixeElement
+                    );
+                }
+
+                resultat.add(convertParameter(valeur, elementType, prefixeElement));
+            } else {
+                // Construit l'objet avec les champs comme fruits[0].nom.
+                resultat.add(binderObject(elementType, prefixeElement, req));
+            }
+        }
+
+        return resultat;
+    }
+
+    /**
+     * Récupère le type de List<T>, par exemple String.class ou Fruit.class.
+     */
+    private static Class<?> getListElementType(Type genericType, String nomListe) {
+        if (!(genericType instanceof ParameterizedType)) {
+            throw new IllegalArgumentException(
+                "Précisez le type générique de la liste " + nomListe
+                + " (exemple : List<String> ou List<Fruit>)."
+            );
+        }
+
+        ParameterizedType parameterizedType = (ParameterizedType) genericType;
+        Type elementType = parameterizedType.getActualTypeArguments()[0];
+
+        if (!(elementType instanceof Class<?>)) {
+            throw new IllegalArgumentException(
+                "Type d'élément non pris en charge dans la liste "
+                + nomListe + " : " + elementType.getTypeName()
+            );
+        }
+
+        return (Class<?>) elementType;
+    }
+
+    /**
+     * Repère les indices présents dans la requête, dans l'ordre croissant.
+     * Exemple : fruits[0].nom et fruits[0].prix représentent un seul indice : 0.
+     */
+    private static Set<Integer> getListIndexes(
+            String prefixe,
+            HttpServletRequest req) {
+
+        Set<Integer> indexes = new TreeSet<>();
+        Pattern pattern = Pattern.compile(
+            Pattern.quote(prefixe) + "\\[(\\d+)\\](?:\\..*)?"
+        );
+
+        for (String nomParam : req.getParameterMap().keySet()) {
+            Matcher matcher = pattern.matcher(nomParam);
+            if (matcher.matches()) {
+                indexes.add(Integer.parseInt(matcher.group(1)));
+            }
+        }
+
+        return indexes;
     }
 }
