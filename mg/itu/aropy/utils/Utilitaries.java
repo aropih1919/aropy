@@ -1,6 +1,7 @@
 package mg.itu.aropy.utils;
 
 import java.io.File;
+import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Target;
@@ -23,152 +24,166 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.ServletException;
 import mg.itu.aropy.annotation.URLMapping;
+
+//importation de part
+import jakarta.servlet.http.Part;
 public class Utilitaries {
-    public static List<Class<?>> findAllClassesIn(String packageName)throws Exception{
-        //fonction rechercher les classes dispo dans packageName
+    public static List<Class<?>> findAllClassesIn(String packageName) throws Exception {
+        // fonction rechercher les classes dispo dans packageName
         String pathPackage = packageName.replace('.', '/');
         ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
         URL resource = classLoader.getResource(pathPackage);
         File directory = new File(resource.getFile());
-        List <Class<?>> listClassName = new ArrayList<>();
+        List<Class<?>> listClassName = new ArrayList<>();
 
         // System.out.println(directory.getName());
         if (directory.exists()) {
             File[] files = directory.listFiles();
             for (int i = 0; i < files.length; i++) {
                 if (files[i].getName().endsWith(".class") && files[i].isFile()) {
-                    String className = packageName +"."+files[i].getName().substring(0, files[i].getName().length() - 6);
+                    String className = packageName + "."
+                            + files[i].getName().substring(0, files[i].getName().length() - 6);
                     Class<?> tempo = Class.forName(className, true, Thread.currentThread().getContextClassLoader());
                     listClassName.add(tempo);
                 }
             }
             return listClassName;
         }
-        //else manquant 
-        else{
-            throw new Exception(" not found is the "+directory.getName());
+        // else manquant
+        else {
+            throw new Exception(" not found is the " + directory.getName());
         }
     }
-    public static boolean verifierAnnotationEtNiveau(AnnotatedElement element, Class<? extends Annotation> annotationClass, ElementType niveauRecherche) {
-        
+
+    public static boolean verifierAnnotationEtNiveau(AnnotatedElement element,
+            Class<? extends Annotation> annotationClass, ElementType niveauRecherche) {
+
         Annotation[] annotations = element.getAnnotations();
         System.out.println("  [debug] element=" + element + " nb annotations=" + annotations.length);
         for (Annotation a : annotations) {
             System.out.println("  [debug] annotation trouvée : " + a.annotationType().getName());
-            //verfication de son existance d abord
+            // verfication de son existance d abord
             if (a.annotationType().equals(annotationClass)) {
-                //verificagtion du niveau
+                // verificagtion du niveau
                 Target target = annotationClass.getAnnotation(Target.class);
-                //sans specification précise, disponible partout
+                // sans specification précise, disponible partout
                 if (target == null) {
-                    return true; 
+                    return true;
                 }
-                if(Arrays.asList(target.value()).contains(niveauRecherche)){
+                if (Arrays.asList(target.value()).contains(niveauRecherche)) {
                     return true;
                 }
             }
         }
         return false;
     }
+
     // Target ou seulement du string
-    public static List<String> findClassesWithAnnotation(String packageName, Class<? extends Annotation> annotationClass, ElementType niveauRecherche){
-        //utilisation du findAllClassesIn pour avoir la list des classe dispo
+    public static List<String> findClassesWithAnnotation(String packageName,
+            Class<? extends Annotation> annotationClass, ElementType niveauRecherche) {
+        // utilisation du findAllClassesIn pour avoir la list des classe dispo
         List<String> tempo = new ArrayList<>();
-        try{
-            List <Class<?>> listClass = findAllClassesIn(packageName);
-            //boucler list des classes et verification de chaque classe si contenant l annotation ou pas
-            for(Class clazz : listClass){
-                boolean annotationPresent = verifierAnnotationEtNiveau(clazz,annotationClass,niveauRecherche);
-                if(annotationPresent){
+        try {
+            List<Class<?>> listClass = findAllClassesIn(packageName);
+            // boucler list des classes et verification de chaque classe si contenant l
+            // annotation ou pas
+            for (Class clazz : listClass) {
+                boolean annotationPresent = verifierAnnotationEtNiveau(clazz, annotationClass, niveauRecherche);
+                if (annotationPresent) {
                     tempo.add(clazz.getName());
                 }
             }
-        }catch(Exception e){
+        } catch (Exception e) {
             e.printStackTrace();
         }
-        
+
         return tempo;
     }
-    //Recherche de method dans une classe
-    public static List<Method> findAllMethodIn(Class<?> clazz){
+
+    // Recherche de method dans une classe
+    public static List<Method> findAllMethodIn(Class<?> clazz) {
         List<Method> listMethods = new ArrayList<>();
         System.out.println("###### Taille listeMethods avant ###### =" + listMethods.size());
 
         Method[] methods = clazz.getDeclaredMethods();
-        for(int j = 0; j < methods.length; j++){
+        for (int j = 0; j < methods.length; j++) {
             listMethods.add(methods[j]);
         }
         System.out.println("###### Taille listeMethods apres ###### =" + listMethods.size());
 
         return listMethods;
     }
-    //Fonction qui retourne Map<String,URLInformation> grandMap
-    public static Map<ModelURLMapping,URLInformation> findURLCompleted(String className){
-        Map<ModelURLMapping,URLInformation> grandMap = new HashMap<>();
+
+    // Fonction qui retourne Map<String,URLInformation> grandMap
+    public static Map<ModelURLMapping, URLInformation> findURLCompleted(String className) {
+        Map<ModelURLMapping, URLInformation> grandMap = new HashMap<>();
         System.out.println("###### VERSION TEST 12345 ###### className=" + className);
-        try{
-            //par reflection, on cherche laa classe correspondant au string 
+        try {
+            // par reflection, on cherche laa classe correspondant au string
             System.out.println("###### AVANT Class.forName");
             ClassLoader cl = Thread.currentThread().getContextClassLoader();
             System.out.println("###### Classloader utilisé : " + cl);
             Class<?> clazz = Class.forName(className, false, cl);
-            //pour une classe , obtenir la liste des methods
+            // pour une classe , obtenir la liste des methods
             System.out.println("###### AVANT findAllMethodIn");
             List<Method> methods = findAllMethodIn(clazz);
             System.out.println("###### APRES ");
 
-            //parcourir method et verifier si urlMapping présent
+            // parcourir method et verifier si urlMapping présent
             System.out.println("[debug] classe=" + className + " nb methods=" + methods.size());
-            for(Method method : methods){
+            for (Method method : methods) {
                 System.out.println("[debug] examen de la méthode : " + method.getName());
-                boolean check = verifierAnnotationEtNiveau(method,URLMapping.class,ElementType.METHOD);
+                boolean check = verifierAnnotationEtNiveau(method, URLMapping.class, ElementType.METHOD);
                 System.out.println("[debug] résultat check URLMapping pour " + method.getName() + " : " + check);
-                if(check){
-                //si oui, on essaie de obtenir la valeur de l attribut. On fait push avec clés la valeur de l url, et urlInformation pour controller et method
+                if (check) {
+                    // si oui, on essaie de obtenir la valeur de l attribut. On fait push avec clés
+                    // la valeur de l url, et urlInformation pour controller et method
                     URLMapping ump = method.getAnnotation(URLMapping.class);
                     URLInformation ui = new URLInformation(clazz, method);
                     ModelURLMapping modelURLMapping = new ModelURLMapping(ump.urlPath(), ump.method());
                     grandMap.put(modelURLMapping, ui);
                 }
             }
-        }
-        catch(ClassNotFoundException e){
+        } catch (ClassNotFoundException e) {
             System.out.println(e.getMessage());
-        }
-        catch(Throwable t){
+        } catch (Throwable t) {
             System.out.println("[debug] THROWABLE ATTRAPÉ : " + t.getClass().getName() + " - " + t.getMessage());
             t.printStackTrace(System.out); // forcer la sortie vers System.out, pas System.err
         }
-        //à la fin, on retourne 
-        
+        // à la fin, on retourne
+
         return grandMap;
     }
-    //fonction de matching entre requetes et arguments.
-    // public static List<Object> matcher(Parameter[] parametres,HttpServletRequest req){
-    //     List<Object> arguments = new ArrayList<>();
-    //     for (Parameter parametre : parametres) {
-    //     // Recuperer nom des params
-    //         String nomParam = parametre.getName();
-    //         if(req.getParameter(nomParam) != null){
-    //             arguments.add(req.getParameter(nomParam));
-    //         }
-    //     }
-    //     // Verifier dans nom du req l existance
-    //     // Si oui, on match direct
-    //     return arguments;
+
+    // fonction de matching entre requetes et arguments.
+    // public static List<Object> matcher(Parameter[] parametres,HttpServletRequest
+    // req){
+    // List<Object> arguments = new ArrayList<>();
+    // for (Parameter parametre : parametres) {
+    // // Recuperer nom des params
+    // String nomParam = parametre.getName();
+    // if(req.getParameter(nomParam) != null){
+    // arguments.add(req.getParameter(nomParam));
+    // }
+    // }
+    // // Verifier dans nom du req l existance
+    // // Si oui, on match direct
+    // return arguments;
     // }
     public static List<Object> matcher(
-        Parameter[] parametres,
-        HttpServletRequest req) {
+            Parameter[] parametres,
+            HttpServletRequest req) {
 
         List<Object> arguments = new ArrayList<>();
 
         for (Parameter parametre : parametres) {
             String nomParam = parametre.getName();
             Class<?> typeParam = parametre.getType();
-            //verification si type de parametre est encore basique (String, int, double, boolean, etc.) ou un enum
-            if(typeIsSupported(parametre.getType())){
+            // verification si type de parametre est encore basique (String, int, double,
+            // boolean, etc.) ou un enum
+            if (typeIsSupported(parametre.getType())) {
                 String valeur = req.getParameter(nomParam);
 
                 System.out.println("Nom du paramètre Java : " + nomParam);
@@ -176,22 +191,27 @@ public class Utilitaries {
 
                 if (valeur == null) {
                     throw new IllegalArgumentException(
-                        "Paramètre HTTP manquant : " + nomParam
-                        + ". Vérifiez que la méthode a été compilée avec -parameters."
-                    );
+                            "Paramètre HTTP manquant : " + nomParam
+                                    + ". Vérifiez que la méthode a été compilée avec -parameters.");
                 }
 
-                arguments.add(convertParameter(valeur,typeParam, nomParam));
-            }else if (List.class.isAssignableFrom(typeParam)) {
+                arguments.add(convertParameter(valeur, typeParam, nomParam));
+            } else if (List.class.isAssignableFrom(typeParam)) {
                 // Exemple : List<String> competences -> competences[0], competences[1]
                 arguments.add(binderList(
-                    parametre.getParameterizedType(),
-                    nomParam,
-                    req
-                ));
+                        parametre.getParameterizedType(),
+                        nomParam,
+                        req));
 
-            }else {
-                Object instance = binderObject(typeParam,nomParam,req);
+            } else if (typeParam.equals(FileManagerAropy.class)) {
+                // Exemple : FileManagerAropy fichier -> fichier.filename, fichier.extension, fichier.file
+                arguments.add(binderFileManagerAropy(
+                        parametre.getParameterizedType(),
+                        nomParam,
+                        req));
+            }
+            else {
+                Object instance = binderObject(typeParam, nomParam, req);
                 arguments.add(instance);
             }
         }
@@ -200,13 +220,20 @@ public class Utilitaries {
 
     private static Object convertParameter(String valeur, Class<?> type, String nomParam) {
         try {
-            if (type == String.class || type == Object.class) return valeur;
-            if (type == int.class || type == Integer.class) return Integer.valueOf(valeur);
-            if (type == long.class || type == Long.class) return Long.valueOf(valeur);
-            if (type == double.class || type == Double.class) return Double.valueOf(valeur);
-            if (type == float.class || type == Float.class) return Float.valueOf(valeur);
-            if (type == short.class || type == Short.class) return Short.valueOf(valeur);
-            if (type == byte.class || type == Byte.class) return Byte.valueOf(valeur);
+            if (type == String.class || type == Object.class)
+                return valeur;
+            if (type == int.class || type == Integer.class)
+                return Integer.valueOf(valeur);
+            if (type == long.class || type == Long.class)
+                return Long.valueOf(valeur);
+            if (type == double.class || type == Double.class)
+                return Double.valueOf(valeur);
+            if (type == float.class || type == Float.class)
+                return Float.valueOf(valeur);
+            if (type == short.class || type == Short.class)
+                return Short.valueOf(valeur);
+            if (type == byte.class || type == Byte.class)
+                return Byte.valueOf(valeur);
             if (type == boolean.class || type == Boolean.class) {
                 if (!"true".equalsIgnoreCase(valeur) && !"false".equalsIgnoreCase(valeur)) {
                     throw new IllegalArgumentException("valeur booléenne invalide");
@@ -214,38 +241,40 @@ public class Utilitaries {
                 return Boolean.valueOf(valeur);
             }
             if (type == char.class || type == Character.class) {
-                if (valeur.length() != 1) throw new IllegalArgumentException("caractère invalide");
+                if (valeur.length() != 1)
+                    throw new IllegalArgumentException("caractère invalide");
                 return valeur.charAt(0);
             }
             if (type.isEnum()) {
-                @SuppressWarnings({"rawtypes", "unchecked"})
+                @SuppressWarnings({ "rawtypes", "unchecked" })
                 Object enumValue = Enum.valueOf((Class<? extends Enum>) type, valeur);
                 return enumValue;
             }
         } catch (RuntimeException e) {
             throw new IllegalArgumentException(
-                "Valeur '" + valeur + "' invalide pour le paramètre '" + nomParam
-                + "' de type " + type.getSimpleName(), e
-            );
+                    "Valeur '" + valeur + "' invalide pour le paramètre '" + nomParam
+                            + "' de type " + type.getSimpleName(),
+                    e);
         }
 
         throw new IllegalArgumentException(
-            "Type de paramètre non pris en charge pour '" + nomParam + "' : " + type.getName()
-        );
+                "Type de paramètre non pris en charge pour '" + nomParam + "' : " + type.getName());
     }
+
     public static boolean typeIsSupported(Class<?> type) {
         return type == String.class || type == Object.class ||
-               type == int.class || type == Integer.class ||
-               type == long.class || type == Long.class ||
-               type == double.class || type == Double.class ||
-               type == float.class || type == Float.class ||
-               type == short.class || type == Short.class ||
-               type == byte.class || type == Byte.class ||
-               type == boolean.class || type == Boolean.class ||
-               type == char.class || type == Character.class ||
-               type.isEnum();
+                type == int.class || type == Integer.class ||
+                type == long.class || type == Long.class ||
+                type == double.class || type == Double.class ||
+                type == float.class || type == Float.class ||
+                type == short.class || type == Short.class ||
+                type == byte.class || type == Byte.class ||
+                type == boolean.class || type == Boolean.class ||
+                type == char.class || type == Character.class ||
+                type.isEnum();
     }
-    private static Object binderObject(Class<?> type,String prefixe,HttpServletRequest req) {
+
+    private static Object binderObject(Class<?> type, String prefixe, HttpServletRequest req) {
         try {
             // 1. Instancier l'objet
             Object instance = type.getDeclaredConstructor().newInstance();
@@ -263,7 +292,7 @@ public class Utilitaries {
                         : prefixe + "." + nomField;
 
                 Class<?> typeField = field.getType();
-                
+
                 // 3. Traiter les attributs simples
                 if (typeIsSupported(typeField)) {
 
@@ -276,8 +305,7 @@ public class Utilitaries {
                         Object valeurConvertie = convertParameter(
                                 valeur,
                                 typeField,
-                                nomHttp
-                        );
+                                nomHttp);
 
                         field.set(instance, valeurConvertie);
                     }
@@ -287,19 +315,17 @@ public class Utilitaries {
                     List<?> liste = binderList(
                             field.getGenericType(),
                             nomHttp,
-                            req
-                    );
+                            req);
 
                     field.setAccessible(true);
                     field.set(instance, liste);
 
-                }else {
+                } else {
                     // 4. Traiter récursivement les objets imbriqués
                     Object objetImbrique = binderObject(
                             typeField,
                             nomHttp,
-                            req
-                    );
+                            req);
 
                     field.setAccessible(true);
                     field.set(instance, objetImbrique);
@@ -311,34 +337,35 @@ public class Utilitaries {
         } catch (NoSuchMethodException e) {
             throw new RuntimeException(
                     "Aucun constructeur sans argument pour : "
-                            + type.getName(), e
-            );
+                            + type.getName(),
+                    e);
 
         } catch (InstantiationException e) {
             throw new RuntimeException(
                     "Impossible d'instancier : "
-                            + type.getName(), e
-            );
+                            + type.getName(),
+                    e);
 
         } catch (IllegalAccessException e) {
             throw new RuntimeException(
                     "Impossible d'accéder aux attributs de : "
-                            + type.getName(), e
-            );
+                            + type.getName(),
+                    e);
 
         } catch (InvocationTargetException e) {
             throw new RuntimeException(
                     "Erreur dans le constructeur de : "
-                            + type.getName(), e.getCause()
-            );
+                            + type.getName(),
+                    e.getCause());
 
         } catch (SecurityException e) {
             throw new RuntimeException(
                     "Accès refusé pour : "
-                            + type.getName(), e
-            );
+                            + type.getName(),
+                    e);
         }
     }
+
     private static List<Object> binderList(
             Type genericType,
             String prefixe,
@@ -356,8 +383,7 @@ public class Utilitaries {
 
                 if (valeur == null) {
                     throw new IllegalArgumentException(
-                        "Paramètre HTTP manquant : " + prefixeElement
-                    );
+                            "Paramètre HTTP manquant : " + prefixeElement);
                 }
 
                 resultat.add(convertParameter(valeur, elementType, prefixeElement));
@@ -376,9 +402,8 @@ public class Utilitaries {
     private static Class<?> getListElementType(Type genericType, String nomListe) {
         if (!(genericType instanceof ParameterizedType)) {
             throw new IllegalArgumentException(
-                "Précisez le type générique de la liste " + nomListe
-                + " (exemple : List<String> ou List<Fruit>)."
-            );
+                    "Précisez le type générique de la liste " + nomListe
+                            + " (exemple : List<String> ou List<Fruit>).");
         }
 
         ParameterizedType parameterizedType = (ParameterizedType) genericType;
@@ -386,9 +411,8 @@ public class Utilitaries {
 
         if (!(elementType instanceof Class<?>)) {
             throw new IllegalArgumentException(
-                "Type d'élément non pris en charge dans la liste "
-                + nomListe + " : " + elementType.getTypeName()
-            );
+                    "Type d'élément non pris en charge dans la liste "
+                            + nomListe + " : " + elementType.getTypeName());
         }
 
         return (Class<?>) elementType;
@@ -404,8 +428,7 @@ public class Utilitaries {
 
         Set<Integer> indexes = new TreeSet<>();
         Pattern pattern = Pattern.compile(
-            Pattern.quote(prefixe) + "\\[(\\d+)\\](?:\\..*)?"
-        );
+                Pattern.quote(prefixe) + "\\[(\\d+)\\](?:\\..*)?");
 
         for (String nomParam : req.getParameterMap().keySet()) {
             Matcher matcher = pattern.matcher(nomParam);
@@ -416,4 +439,71 @@ public class Utilitaries {
 
         return indexes;
     }
+
+    private static FileManagerAropy binderFileManagerAropy(Type genericType, String nom, HttpServletRequest req) {
+        try {
+            Part part = req.getPart(nom);
+
+            // Le paramètre Java peut s'appeler « file » alors que le champ HTML
+            // s'appelle « fichier ». Si le nom ne correspond pas, on accepte un
+            // unique champ fichier non vide dans le formulaire.
+            if (part == null || part.getSubmittedFileName() == null || part.getSize() == 0) {
+                Part uniquePart = null;
+                for (Part candidate : req.getParts()) {
+                    if (candidate.getSubmittedFileName() != null && candidate.getSize() > 0) {
+                        if (uniquePart != null) {
+                            throw new IllegalArgumentException(
+                                    "Plusieurs fichiers ont été envoyés; le champ doit s'appeler '" + nom + "'.");
+                        }
+                        uniquePart = candidate;
+                    }
+                }
+                part = uniquePart;
+            }
+
+            if (part == null || part.getSubmittedFileName() == null || part.getSize() == 0) {
+                return null;
+            }
+
+            String filename = new File(part.getSubmittedFileName()).getName();
+            String extension = "";
+            int dot = filename.lastIndexOf('.');
+            if (dot >= 0 && dot < filename.length() - 1) {
+                extension = filename.substring(dot + 1);
+            }
+            return new FileManagerAropy(filename, extension, part.getInputStream().readAllBytes());
+        } catch (ServletException | IOException e) {
+            throw new IllegalArgumentException("Impossible de lire le fichier multipart '" + nom + "'.", e);
+        }
+    }
+    // fonction upload pour FileManagerAropy : deplacement vers dossier de destination
+    public static void uploadFileManagerAropy(FileManagerAropy fichier, String destinationPath) {
+        if (fichier != null && fichier.getFile() != null) {
+            try {
+                java.nio.file.Path destinationDir = java.nio.file.Paths.get(destinationPath)
+                        .toAbsolutePath().normalize();
+                java.nio.file.Files.createDirectories(destinationDir);
+
+                // N'autorise qu'un nom de fichier, jamais un chemin fourni par le client.
+                String filename = new File(fichier.getFilename()).getName();
+                if (filename.isBlank()) {
+                    throw new IllegalArgumentException("Le nom du fichier uploadé est vide.");
+                }
+                java.nio.file.Path destinationFile = destinationDir.resolve(filename).normalize();
+                if (!destinationFile.getParent().equals(destinationDir)) {
+                    throw new IllegalArgumentException("Nom de fichier invalide : " + filename);
+                }
+                java.nio.file.Files.write(destinationFile, fichier.getFile());
+            } catch (Exception e) {
+                throw new RuntimeException(
+                        "Erreur lors de l'upload du fichier vers '" + destinationPath
+                                + "'. Vérifiez que le dossier existe et que le compte Tomcat peut y écrire. "
+                                + e.getMessage(),
+                        e);
+            }
+        } else {
+            throw new IllegalArgumentException("Le fichier est null ou vide.");
+        }
+    }
+
 }

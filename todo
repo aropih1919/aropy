@@ -58,3 +58,108 @@ Argument avec un ou des objets differents OK
     attribut de l objet qui est aussi un objet à gérer OK
 Argument avec une liste d objets 
     recupère les ....... ?
+    
+Sprint 8: Upload fichier
+Objectif : pouvoir passer d un view vers un controller un ou plusieurs fichiers.
+Comment : 
+Approche 1: (on progress)
+    - Creation d une classe contenant filename, extension, tableau Bytes . FileManagerAropy dans utils (ok)
+    - On verifie juste les attributs de la classe dans l argument de la methode d action si il possède ou pas l attribut avec notre classe FileManagerAropy
+        - Si existence, on bind automatique (filename + extension + tableau byte) (on progress)
+            Comment le faire ?:
+                -   demander de l aide 
+        - Si non existence, aucun changement (non)
+Approche 2:
+    - Creation d une classe qui possède un map pour bien stocker la liste des File aussi
+
+Problème : 
+    - Comment implementer la gestion de formulaire pour le upload d abord ?
+
+### Sprint-7 : Binding
+Objectif : faire enregistrer les données envoyées depuis un formulaire par paramètres, sans instanciation d’objet pour l’instant.
+- [x] Créer un formulaire
+- [x] Créer un controller qui envoie vers le formulaire
+  * [x] Pas encore de changement au niveau du framework
+- [x] Modifier le FrontServlet
+  * [x] Vérifier si la requête contient des paramètres
+  * [x] Si aucun paramètre → faire un invoke simple
+  * [x] Si des paramètres existent :
+    * [x] récupérer les paramètres de la requête
+    * [x] récupérer leur nom et leur valeur
+    * [x] faire le matching avec les paramètres de la méthode du controller
+    * [x] ajouter les paramètres correspondants à l'appel de la méthode
+    * [x] faire le invoke
+- [x] Créer la méthode save(...) dans le controller
+  * [x] Recevoir les paramètres du formulaire
+  * [x] Pour l'instant, recevoir les paramètres directement, pas un objet
+- [x] Relier le formulaire au save()
+  * [x] Formulaire → bouton Submit
+  * [x] Submit → URL
+  * [x] URL → FrontServlet
+  * [x] FrontServlet → mapper le controller
+  * [x] Controller → save(...)
+- [x] Tester le binding
+  * [x] Vérifier les paramètres reçus avec request.getParameter(...)
+  * [x] Vérifier que le nom du paramètre du formulaire correspond au nom du paramètre de la méthode
+  * [x] Vérifier le nombre de paramètres
+  * [x] Vérifier le matching
+  * [x] Vérifier que les valeurs sont correctement passées au invoke
+- [x] Cas particulier
+  * [x] Pour l'instant, ce n'est pas un objet
+  * [x] Si l'objet est null, prendre d'abord les paramètres de la requête
+  * [x] L'instanciation et le binding vers un objet viendront plus tard
+
+### Sprint-7 bis : Binding avec objet
+Objectif : pouvoir recevoir un objet (ex: Employe) dans la méthode du controller. Le framework instancie l’objet et remplit ses propriétés à partir des paramètres du formulaire.
+- [x] Modifier Util.getParameter(...)
+  - [x] Détecter si le paramètre de la méthode est un type simple (String, `int`…) ou un objet
+  - [x] Si type simple → garder le comportement actuel
+  - [x] Si objet :
+    - [x] Créer une instance avec le constructeur sans argument
+    - [x] Pour chaque propriété de l’objet, récupérer la valeur dans la requête et appeler le setter
+    - [x] Mettre l’objet rempli dans les arguments
+- [x] Modifier la méthode save du controller
+  - [x] Signature : public Employe save(Employe employe)
+  - [x] L’objet arrive déjà rempli
+  - [x] Retourner l’objet
+- [x] Tester
+  - [x] Envoyer le formulaire
+  - [x] Vérifier que l’objet est bien créé et rempli (nom, `poste`…)
+  - [x] Vérifier que le binding simple continue de marcher
+
+### Sprint-8 : Upload fichier
+Objectif : dans le formulaire on pourra envoyer un fichier, le fichier pourra etre traiter dans le framework, face au solution propose voici ce que j'ai pris :
+Voici une version du Sprint-8 dans le même format que le 7 :
+
+### Sprint-8 : Upload fichier
+Objectif : pouvoir envoyer un fichier depuis un formulaire et le récupérer dans la méthode du controller sous forme d'un objet Fichier, en réutilisant le mécanisme de binding existant.
+- [x] Créer la classe Fichier
+  - [x] Constructeur sans argument
+  - [x] Propriétés : nom, typeContenu, taille, contenu (byte[])
+  - [x] Getters / setters
+- [x] Préparer le formulaire
+  - [x] Ajouter enctype="multipart/form-data" et method="post"
+  - [x] Ajouter un <input type="file" name="...">
+  - [x] Garder un champ texte normal pour vérifier que le mélange texte + fichier marche
+- [x] Activer le multipart dans le framework
+  - [x] Ajouter @MultipartConfig sur le FrontControllerServlet
+  - [x] Vérifier que les requêtes non multipart gardent le même chemin de traitement
+- [x] Modifier Util.getParameter(...)
+  - [x] Détecter si le paramètre de la méthode est de type Fichier
+  - [x] Si oui : récupérer la Part correspondante avec request.getPart(nom)
+  - [x] Remplir l'objet Fichier (nom, type, taille, contenu) à partir de la Part
+  - [x] Gérer le cas où aucun fichier n'est envoyé (null)
+  - [x] Si autre type : garder le comportement actuel (type simple / objet)
+- [x] Créer la méthode du controller
+  - [x] Signature du test mixte : public ModelAndView upload(Employe employe, Poste poste, Fichier fichier)
+  - [x] Relier formulaire → URL → FrontServlet → controller
+- [x] Enregistrer le fichier dans le projet de test
+  - [x] Lire le dossier cible dans phoenix-test-fixed/webapp/WEB-INF/upload.properties
+  - [x] Créer le dossier si nécessaire et éviter l'écrasement avec un nom unique
+- [X] Tester
+  - [x] Envoyer un petit fichier et vérifier nom, typeContenu et taille
+  - [x] Vérifier que le contenu est identique à l'original
+  - [x] Tester sans fichier
+  - [X] Tester avec un fichier + des champs texte
+  - [X] Vérifier que le binding simple et le binding objet marchent toujours
+Rédiger
