@@ -1,6 +1,7 @@
 package mg.itu.aropy.controller;
 import java.io.IOException;
 import jakarta.servlet.*;
+import jakarta.servlet.annotation.MultipartConfig;
 import jakarta.servlet.http.*;
 import java.io.PrintWriter;
 import java.lang.annotation.Target;
@@ -23,6 +24,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.lang.reflect.Parameter;
 import mg.itu.aropy.annotation.ResponseBody;
 
+@MultipartConfig
 public class FrontControllerServlet extends HttpServlet {
     List<String> listController;
     Map<ModelURLMapping,URLInformation> grandMap = new HashMap<>();
