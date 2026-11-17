@@ -19,13 +19,17 @@ import mg.itu.aropy.utils.URLInformation;
 import mg.itu.aropy.utils.ModelURLMapping;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Collection;
 import mg.itu.aropy.web.ModelAndView;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.lang.reflect.Parameter;
 import mg.itu.aropy.annotation.ResponseBody;
+import mg.itu.aropy.annotation.Auth;
+import mg.itu.aropy.utils.ResponseHelper;
 
 @MultipartConfig
 public class FrontControllerServlet extends HttpServlet {
+    private static final String AUTH_SESSION_ATTRIBUTE_CONTEXT_KEY = "aropy.auth.sessionAttributeName";
     List<String> listController;
     Map<ModelURLMapping,URLInformation> grandMap = new HashMap<>();
     String viewPrefix;
@@ -66,7 +70,6 @@ public class FrontControllerServlet extends HttpServlet {
     @SuppressWarnings("unchecked")
     public void processRequest(HttpServletRequest req, HttpServletResponse res) throws IOException, ServletException {
         //res.setContentType("text/plain;charset=UTF-8");
-        PrintWriter out = res.getWriter();
         ServletContext sc = getServletContext();
         List<String> controllerNames = (List<String>) sc.getAttribute("controllerNames");
         Map<ModelURLMapping, URLInformation> grandMap = (Map<ModelURLMapping, URLInformation>) sc.getAttribute("routes");
@@ -115,6 +118,10 @@ public class FrontControllerServlet extends HttpServlet {
             
             URLInformation m = grandMap.get(key);
             Method method = m.getFonction();
+
+            if (!checkAuthorization(method, req, res, sc)) {
+                return;
+            }
                     
             try {
                 Object target = m.getClazz().getDeclaredConstructor().newInstance();
@@ -142,10 +149,13 @@ public class FrontControllerServlet extends HttpServlet {
                     ObjectMapper MAPPER = new ObjectMapper();
                     res.setContentType("application/json");
                     res.setCharacterEncoding("UTF-8");
-                    res.getWriter().print(MAPPER.writeValueAsString(result));
-                    out.flush();
+                    PrintWriter responseWriter = res.getWriter();
+                    responseWriter.print(MAPPER.writeValueAsString(result));
+                    responseWriter.flush();
                     return; // Sortir de la méthode après avoir écrit la réponse JSON
                 }
+
+                PrintWriter out = res.getWriter();
                 
                 out.println("STATUT  : OK - URL trouvee");
                 out.println("Detail  : " + grandMap.get(key));
@@ -189,6 +199,7 @@ public class FrontControllerServlet extends HttpServlet {
             }
         }
         else {
+            PrintWriter out = res.getWriter();
             out.println("STATUT  : ERREUR - URL non disponible");
             out.println("----------------------------------------");
             out.println("URLs existantes (" + grandMap.size() + ") :");
@@ -207,6 +218,47 @@ public class FrontControllerServlet extends HttpServlet {
             }
         }
 
-        out.println("========================================");
+        res.getWriter().println("========================================");
+    }
+
+    /** Vérifie @Auth avant de créer le contrôleur ou de binder ses arguments. */
+    private boolean checkAuthorization(Method method, HttpServletRequest req,
+            HttpServletResponse res, ServletContext servletContext) throws IOException {
+        Auth auth = method.getAnnotation(Auth.class);
+        if (auth == null) {
+            auth = method.getDeclaringClass().getAnnotation(Auth.class);
+        }
+        if (auth == null) {
+            return true;
+        }
+
+        Object configuredName = servletContext.getAttribute(AUTH_SESSION_ATTRIBUTE_CONTEXT_KEY);
+        if (!(configuredName instanceof String) || ((String) configuredName).isBlank()) {
+            throw new IllegalStateException("Configuration manquante : définissez le context-param "
+                    + "'authSessionAttributeName' dans web.xml.");
+        }
+
+        HttpSession session = req.getSession(false);
+        Object identityOrRoles = session == null ? null : session.getAttribute((String) configuredName);
+        boolean api = method.isAnnotationPresent(ResponseBody.class);
+        if (identityOrRoles == null) {
+            ResponseHelper.handleUnauthorized(res, api);
+            return false;
+        }
+
+        String requiredRole = auth.role();
+        if (requiredRole.isBlank()) {
+            return true;
+        }
+
+        boolean hasRole = identityOrRoles instanceof String
+                ? requiredRole.equals(identityOrRoles)
+                : identityOrRoles instanceof Collection<?>
+                        && ((Collection<?>) identityOrRoles).contains(requiredRole);
+        if (!hasRole) {
+            ResponseHelper.handleForbidden(res, api);
+            return false;
+        }
+        return true;
     }
 }
