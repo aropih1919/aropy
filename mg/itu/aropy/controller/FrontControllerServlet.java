@@ -140,18 +140,9 @@ public class FrontControllerServlet extends HttpServlet {
 
                 if (isResponseBody) {
                     ObjectMapper MAPPER = new ObjectMapper();
-                    //Verifier si c est pas encore du string
-                    String jsonResponse = "";
-                    if (!(result instanceof String)) {
-                        // Convertir l'objet en String
-                        jsonResponse = result.toString();
-                    } else {
-                        jsonResponse = (String) result;
-                    }
                     res.setContentType("application/json");
                     res.setCharacterEncoding("UTF-8");
-                    res.getWriter().print(MAPPER.writeValueAsString(jsonResponse));
-                    // out.print(jsonResponse);
+                    res.getWriter().print(MAPPER.writeValueAsString(result));
                     out.flush();
                     return; // Sortir de la méthode après avoir écrit la réponse JSON
                 }
