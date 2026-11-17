@@ -26,6 +26,7 @@ import org.springframework.context.annotation.AnnotationConfigApplicationContext
  */
 // @WebListener
 public class AppInitializer implements ServletContextListener {
+    private static final String AUTH_SESSION_ATTRIBUTE_CONTEXT_KEY = "aropy.auth.sessionAttributeName";
 
     @Override
     public void contextInitialized(ServletContextEvent sce) {
@@ -33,6 +34,10 @@ public class AppInitializer implements ServletContextListener {
         if (packageName == null || packageName.isBlank()) {
             sce.getServletContext().log("Aropy: aucun package configuré.");
             return;
+        }
+        String authSessionAttributeName = sce.getServletContext().getInitParameter("authSessionAttributeName");
+        if (authSessionAttributeName != null && !authSessionAttributeName.isBlank()) {
+            sce.getServletContext().setAttribute(AUTH_SESSION_ATTRIBUTE_CONTEXT_KEY, authSessionAttributeName.trim());
         }
         // try {
         //     String configClassName = sce.getServletContext().getInitParameter("configClass");
@@ -132,6 +137,14 @@ public class AppInitializer implements ServletContextListener {
                 registerController(clazz, routes);
             }
 
+            boolean hasProtectedRoute = routes.values().stream().anyMatch(route ->
+                    route.getFonction().isAnnotationPresent(mg.itu.aropy.annotation.Auth.class)
+                            || route.getClazz().isAnnotationPresent(mg.itu.aropy.annotation.Auth.class));
+            if (hasProtectedRoute && (authSessionAttributeName == null || authSessionAttributeName.isBlank())) {
+                throw new IllegalStateException("Une route utilise @Auth, mais le context-param "
+                        + "'authSessionAttributeName' n'est pas défini dans web.xml.");
+            }
+
             sce.getServletContext().setAttribute("controllerNames", controllerNames);
             sce.getServletContext().setAttribute("routes", routes);
             sce.getServletContext().setAttribute("viewPrefix", viewPrefix);
@@ -149,6 +162,7 @@ public class AppInitializer implements ServletContextListener {
         // Cleanup on shutdown if needed
         sce.getServletContext().removeAttribute("controllerNames");
         sce.getServletContext().removeAttribute("routes");
+        sce.getServletContext().removeAttribute(AUTH_SESSION_ATTRIBUTE_CONTEXT_KEY);
     }
 
     private void registerController(String clazz, Map<ModelURLMapping, URLInformation> routes) throws Exception {
