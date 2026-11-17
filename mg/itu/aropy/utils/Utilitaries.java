@@ -26,6 +26,7 @@ import java.util.regex.Pattern;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.ServletException;
 import mg.itu.aropy.annotation.URLMapping;
+import mg.itu.aropy.session.AropySession;
 
 //importation de part
 import jakarta.servlet.http.Part;
@@ -181,9 +182,12 @@ public class Utilitaries {
         for (Parameter parametre : parametres) {
             String nomParam = parametre.getName();
             Class<?> typeParam = parametre.getType();
+            if (typeParam.equals(AropySession.class)) {
+                arguments.add(new AropySession(req.getSession()));
+            }
             // verification si type de parametre est encore basique (String, int, double,
             // boolean, etc.) ou un enum
-            if (typeIsSupported(parametre.getType())) {
+            else if (typeIsSupported(parametre.getType())) {
                 String valeur = req.getParameter(nomParam);
 
                 System.out.println("Nom du paramètre Java : " + nomParam);
