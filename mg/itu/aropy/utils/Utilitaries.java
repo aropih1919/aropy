@@ -119,7 +119,6 @@ public class Utilitaries {
 
     // Fonction qui retourne Map<String,URLInformation> grandMap
     public static Map<ModelURLMapping, URLInformation> findURLCompleted(String className) {
-        Map<ModelURLMapping, URLInformation> grandMap = new HashMap<>();
         System.out.println("###### VERSION TEST 12345 ###### className=" + className);
         try {
             // par reflection, on cherche laa classe correspondant au string
@@ -127,34 +126,33 @@ public class Utilitaries {
             ClassLoader cl = Thread.currentThread().getContextClassLoader();
             System.out.println("###### Classloader utilisé : " + cl);
             Class<?> clazz = Class.forName(className, false, cl);
-            // pour une classe , obtenir la liste des methods
-            System.out.println("###### AVANT findAllMethodIn");
-            List<Method> methods = findAllMethodIn(clazz);
-            System.out.println("###### APRES ");
-
-            // parcourir method et verifier si urlMapping présent
-            System.out.println("[debug] classe=" + className + " nb methods=" + methods.size());
-            for (Method method : methods) {
-                System.out.println("[debug] examen de la méthode : " + method.getName());
-                boolean check = verifierAnnotationEtNiveau(method, URLMapping.class, ElementType.METHOD);
-                System.out.println("[debug] résultat check URLMapping pour " + method.getName() + " : " + check);
-                if (check) {
-                    // si oui, on essaie de obtenir la valeur de l attribut. On fait push avec clés
-                    // la valeur de l url, et urlInformation pour controller et method
-                    URLMapping ump = method.getAnnotation(URLMapping.class);
-                    URLInformation ui = new URLInformation(clazz, method);
-                    ModelURLMapping modelURLMapping = new ModelURLMapping(ump.urlPath(), ump.method());
-                    grandMap.put(modelURLMapping, ui);
-                }
-            }
+            return findURLCompleted(clazz);
         } catch (ClassNotFoundException e) {
             System.out.println(e.getMessage());
         } catch (Throwable t) {
             System.out.println("[debug] THROWABLE ATTRAPÉ : " + t.getClass().getName() + " - " + t.getMessage());
             t.printStackTrace(System.out); // forcer la sortie vers System.out, pas System.err
         }
-        // à la fin, on retourne
+        return new HashMap<>();
+    }
 
+    /** Construit les routes à partir de la classe déjà chargée par le listener. */
+    public static Map<ModelURLMapping, URLInformation> findURLCompleted(Class<?> clazz) {
+        Map<ModelURLMapping, URLInformation> grandMap = new HashMap<>();
+        try {
+            List<Method> methods = findAllMethodIn(clazz);
+            System.out.println("[debug] classe=" + clazz.getName() + " nb methods=" + methods.size());
+            for (Method method : methods) {
+                if (verifierAnnotationEtNiveau(method, URLMapping.class, ElementType.METHOD)) {
+                    URLMapping mapping = method.getAnnotation(URLMapping.class);
+                    grandMap.put(new ModelURLMapping(mapping.urlPath(), mapping.method()),
+                            new URLInformation(clazz, method));
+                }
+            }
+        } catch (Throwable t) {
+            System.out.println("[debug] Erreur de scan pour " + clazz.getName() + " : " + t.getMessage());
+            t.printStackTrace(System.out);
+        }
         return grandMap;
     }
 

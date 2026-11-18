@@ -74,6 +74,8 @@ public class FrontControllerServlet extends HttpServlet {
         ServletContext sc = getServletContext();
         List<String> controllerNames = (List<String>) sc.getAttribute("controllerNames");
         Map<ModelURLMapping, URLInformation> grandMap = (Map<ModelURLMapping, URLInformation>) sc.getAttribute("routes");
+        Map<Class<?>, Object> controllerInstances =
+                (Map<Class<?>, Object>) sc.getAttribute("controllerInstances");
         String viewPrefix = (String) sc.getAttribute("viewPrefix");
         String viewSuffix = (String) sc.getAttribute("viewSuffix");
         // out.println("<html>");
@@ -125,7 +127,11 @@ public class FrontControllerServlet extends HttpServlet {
             }
                     
             try {
-                Object target = m.getClazz().getDeclaredConstructor().newInstance();
+                Object target = controllerInstances == null ? null : controllerInstances.get(m.getClazz());
+                if (target == null) {
+                    throw new IllegalStateException("Aropy: aucune instance singleton enregistrée pour le contrôleur "
+                            + m.getClazz().getName() + ". Vérifiez l'initialisation de l'application.");
+                }
                 // Rendre la méthode accessible même si elle est private
                 method.setAccessible(true);
                 // Section pour la gestion de invoke fonction avec arguments 
@@ -195,8 +201,6 @@ public class FrontControllerServlet extends HttpServlet {
                 throw new RuntimeException("Erreur pendant l'exécution de: " + method.getName(), cause);
             } catch (IllegalArgumentException e) {
                 throw new RuntimeException("Arguments invalides pour: " + method.getName(), e);
-            } catch (InstantiationException | NoSuchMethodException e) {
-                throw new RuntimeException("Impossible d'instancier la classe: " + m.getClazz().getName(), e);
             }
         }
         else {
