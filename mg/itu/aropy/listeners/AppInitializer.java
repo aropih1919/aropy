@@ -139,6 +139,7 @@ public class AppInitializer implements ServletContextListener {
 
             boolean hasProtectedRoute = routes.values().stream().anyMatch(route ->
                     route.getFonction().isAnnotationPresent(mg.itu.aropy.annotation.Auth.class)
+                            || route.getFonction().isAnnotationPresent(mg.itu.aropy.annotation.RoleRequired.class)
                             || route.getClazz().isAnnotationPresent(mg.itu.aropy.annotation.Auth.class));
             if (hasProtectedRoute && (authSessionAttributeName == null || authSessionAttributeName.isBlank())) {
                 throw new IllegalStateException("Une route utilise @Auth, mais le context-param "

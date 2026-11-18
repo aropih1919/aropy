@@ -25,6 +25,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.lang.reflect.Parameter;
 import mg.itu.aropy.annotation.ResponseBody;
 import mg.itu.aropy.annotation.Auth;
+import mg.itu.aropy.annotation.RoleRequired;
 import mg.itu.aropy.utils.ResponseHelper;
 
 @MultipartConfig
@@ -228,7 +229,8 @@ public class FrontControllerServlet extends HttpServlet {
         if (auth == null) {
             auth = method.getDeclaringClass().getAnnotation(Auth.class);
         }
-        if (auth == null) {
+        RoleRequired roleRequired = method.getAnnotation(RoleRequired.class);
+        if (auth == null && roleRequired == null) {
             return true;
         }
 
@@ -246,19 +248,35 @@ public class FrontControllerServlet extends HttpServlet {
             return false;
         }
 
-        String requiredRole = auth.role();
-        if (requiredRole.isBlank()) {
-            return true;
-        }
-
-        boolean hasRole = identityOrRoles instanceof String
-                ? requiredRole.equals(identityOrRoles)
-                : identityOrRoles instanceof Collection<?>
-                        && ((Collection<?>) identityOrRoles).contains(requiredRole);
-        if (!hasRole) {
+        if (auth != null && !auth.role().isBlank()
+                && !hasRole(identityOrRoles, auth.role())) {
             ResponseHelper.handleForbidden(res, api);
             return false;
         }
+
+        if (roleRequired != null) {
+            boolean hasAnyRequiredRole = false;
+            for (String role : roleRequired.value()) {
+                if (hasRole(identityOrRoles, role)) {
+                    hasAnyRequiredRole = true;
+                    break;
+                }
+            }
+            if (!hasAnyRequiredRole) {
+                ResponseHelper.handleForbidden(res, api);
+                return false;
+            }
+        }
         return true;
+    }
+
+    private boolean hasRole(Object identityOrRoles, String requiredRole) {
+        if (identityOrRoles instanceof String) {
+            return requiredRole.equals(identityOrRoles);
+        }
+        if (identityOrRoles instanceof Collection<?>) {
+            return ((Collection<?>) identityOrRoles).contains(requiredRole);
+        }
+        return false;
     }
 }
