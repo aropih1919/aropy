@@ -17,6 +17,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 
 
 import org.springframework.context.ApplicationContext;
@@ -119,6 +122,7 @@ public class AppInitializer implements ServletContextListener {
             //List<Class<?>> controllerClasses = ClassScanner.getClasses(packageName, Controller.class);
             List<String> controllerNames = new ArrayList<>();
             Map<ModelURLMapping, URLInformation> routes = new HashMap<>();
+            Map<Class<?>, Object> controllerInstances = new HashMap<>();
             
             String viewPrefix = sce.getServletContext().getInitParameter("viewPrefix");
             String viewSuffix = sce.getServletContext().getInitParameter("viewSuffix");
@@ -133,8 +137,15 @@ public class AppInitializer implements ServletContextListener {
                 controllerNames.addAll(clazzes);
             }
             //fillGrandMap();
-            for (String clazz : controllerNames) {
-                registerController(clazz, routes);
+            for (String className : new LinkedHashSet<>(controllerNames)) {
+                try {
+                    Class<?> controllerClass = Class.forName(className, true, sce.getServletContext().getClassLoader());
+                    Object controller = instantiateController(controllerClass);
+                    controllerInstances.put(controllerClass, controller);
+                    registerController(controllerClass, routes);
+                } catch (ClassNotFoundException e) {
+                    throw new IllegalStateException("Aropy: contrôleur détecté mais introuvable : " + className, e);
+                }
             }
 
             boolean hasProtectedRoute = routes.values().stream().anyMatch(route ->
@@ -147,6 +158,7 @@ public class AppInitializer implements ServletContextListener {
             }
 
             sce.getServletContext().setAttribute("controllerNames", controllerNames);
+            sce.getServletContext().setAttribute("controllerInstances", controllerInstances);
             sce.getServletContext().setAttribute("routes", routes);
             sce.getServletContext().setAttribute("viewPrefix", viewPrefix);
             sce.getServletContext().setAttribute("viewSuffix", viewSuffix);
@@ -163,11 +175,29 @@ public class AppInitializer implements ServletContextListener {
         // Cleanup on shutdown if needed
         sce.getServletContext().removeAttribute("controllerNames");
         sce.getServletContext().removeAttribute("routes");
+        sce.getServletContext().removeAttribute("controllerInstances");
         sce.getServletContext().removeAttribute(AUTH_SESSION_ATTRIBUTE_CONTEXT_KEY);
     }
 
-    private void registerController(String clazz, Map<ModelURLMapping, URLInformation> routes) throws Exception {
-        Map<ModelURLMapping,URLInformation> tempo = Utilitaries.findURLCompleted(clazz);
+    private void registerController(Class<?> controllerClass, Map<ModelURLMapping, URLInformation> routes) {
+        Map<ModelURLMapping,URLInformation> tempo = Utilitaries.findURLCompleted(controllerClass);
         routes.putAll(tempo);
+    }
+
+    private Object instantiateController(Class<?> controllerClass) {
+        try {
+            Constructor<?> constructor = controllerClass.getDeclaredConstructor();
+            constructor.setAccessible(true);
+            return constructor.newInstance();
+        } catch (NoSuchMethodException | InstantiationException | IllegalAccessException e) {
+            throw new IllegalStateException("Aropy: impossible de créer le contrôleur "
+                    + controllerClass.getName() + " au démarrage. Un constructeur sans argument accessible est requis.", e);
+        } catch (InvocationTargetException e) {
+            throw new IllegalStateException("Aropy: le constructeur du contrôleur "
+                    + controllerClass.getName() + " a échoué au démarrage.", e.getCause());
+        } catch (RuntimeException e) {
+            throw new IllegalStateException("Aropy: impossible de créer le contrôleur "
+                    + controllerClass.getName() + " au démarrage.", e);
+        }
     }
 }
